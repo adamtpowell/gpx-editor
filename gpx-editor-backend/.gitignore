@@ -1,4 +1,0 @@
-data/
-Pipfile.lock
-*.sqlite3
-*.pyc
