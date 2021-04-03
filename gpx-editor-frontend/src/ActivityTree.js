@@ -6,12 +6,22 @@ function ActivityTree(activity_tree_json, id) {
 }
 
 ActivityTree.prototype.getRoot = function() {
-    console.log(this._nodes_by_id[0]);
     return this._nodes_by_id[0]; // todo: better logic for the root.
 }
 
 ActivityTree.prototype.getActivityById = function(id) {
     return this._nodes_by_id[id];
+}
+
+ActivityTree.prototype.clone = function() {
+    let newTree = Object.create(ActivityTree.prototype);
+
+    newTree._nodes_by_id = {};
+    for (let activity_id in this._nodes_by_id) {
+        newTree._nodes_by_id[activity_id] = this._nodes_by_id[activity_id].clone(newTree);
+    }
+
+    return newTree;
 }
 
 function ActivityTreeNode(tree, activity_json) {
@@ -25,6 +35,20 @@ function ActivityTreeNode(tree, activity_json) {
 
 ActivityTreeNode.prototype.getChildren = function() {
     return this.child_ids.map(child_id=>this._tree._nodes_by_id[child_id])
+}
+
+ActivityTreeNode.prototype.clone = function(newTree) {
+    let newNode = Object.create(ActivityTreeNode.prototype);
+
+    newNode = new ActivityTreeNode(newTree, {
+        id: this.id,
+        type: this.type,
+        metadata: Object.assign({}, this.metadata), // shallow copy metadata
+        data: Object.assign({}, this.data),
+        children: [...this.child_ids],
+    });
+
+    return newNode;
 }
 
 export { ActivityTree };
