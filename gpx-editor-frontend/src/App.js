@@ -63,7 +63,7 @@ function App() {
   return <main>
     <SideBar>
       <Activities activities={activity_tree} activeElement={activeElement} setActiveElement={setActiveElement} />
-      <Inspector activities={activity_tree} activeElement={activeElement}/>
+      <Inspector activities={activity_tree} activeElement={activeElement} />
     </SideBar>
     <Map activities={activity_tree} activeElement={activeElement} />
   </main>
