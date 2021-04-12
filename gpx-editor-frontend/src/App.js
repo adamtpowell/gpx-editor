@@ -10,41 +10,36 @@ import { mock_activities} from "./MockData";
 // Load leaflet resources
 import 'leaflet/dist/leaflet.css';
 
-import React, { useState, useReducer } from 'react';
+import React, { useState } from 'react';
 
-/**
- * @param  {function(state, action)} speculativeReducer - a regular, synchrounous reducer.
- * @param  {function(state, action, concreteReducer)} concreteGetter - Calls concreteReducer from a promise. Passed concreteValue to concreteReducer
- * @param  {function(state, action, concreteValue)} concreteReducer - another reducer, from the same state as before, taking into account concreteValue from the async function
- * 
- * concreteGetter is fully bound. concreteReducer is called at the end of concreteGetter, and only needs to take the concreteValue.
- */
-function reducerProducer(speculativeReducer, concreteGetter, concreteReducer) {
-  const reducer = function(state, action) {
-    if (concreteReducer !== undefined) {
-      concreteReducer = concreteReducer.bind(this, state, action);
-    }
-    if (concreteReducer !== undefined) {
-      concreteGetter = concreteGetter.bind(this, state, action, concreteReducer);
-    }
-    // Run the speculative reducer, and save its value.
-    // This is the basic react reducer, and if you only need local changes, you just pass this.
-    const speculativeReducerValue = speculativeReducer(state, action);
+// Like use reducer, but with speculative and concrete stages.
+function useSpeculativeReducer(initialState, speculativeReducer, concreteGetter, concreteReducer) {
+  let [state, setState] = useState(initialState);
 
-    Object.freeze(speculativeReducerValue); // Values returned here should be immutable.
+ const reducer = function(state, action) {
+  if (concreteReducer !== undefined) {
+    concreteReducer = concreteReducer.bind(this, state, action);
+  }
+  if (concreteReducer !== undefined && concreteGetter !== undefined) {
+    concreteGetter = concreteGetter.bind(this, state, action, concreteReducer);
+  }
 
-    if (concreteGetter !== undefined) {
-      concreteGetter(state, action, concreteReducer);
-    }
+  const speculativeReducerValue = speculativeReducer(state, action);
+  if (speculativeReducerValue !== undefined) {
+    Object.freeze(speculativeReducerValue);
+    setState(speculativeReducerValue);
+  }
+ }
 
-    return speculativeReducerValue;
-  }  
-  return reducer;  
+ const boundReducer = reducer.bind(this, state); // Bind state to reducer so you only need to call with action.
+
+  return [state, boundReducer];
 }
 
 function App() {
   let [activeElement, setActiveElement] = useState(0);
 
+  // TODO: Extract code to create an action into a custom hook.
   const activitiesReducer = reducerProducer(
     // speculativeReducer: predict how the state will change, and make those changes here.
     function(activities, action) {
@@ -56,7 +51,14 @@ function App() {
     }
   )
 
-  let [activities, dispatchActivitiesAction] = useReducer(activitiesReducer, mock_activities);
+  let [activities, dispatchActivitiesAction] = useSpeculativeReducer(mock_activities, 
+    function(activities, action) {
+      let cloned_metadata = activities.clone(); // Clone the activities data structure.
+      
+      cloned_metadata.getActivityById(action.activity_id).metadata[action.field] = action.value;
+      
+      return cloned_metadata;
+  });
   
   function update_metadata(activity_id, field, value) {
     let action = {
