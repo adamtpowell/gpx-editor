@@ -12,17 +12,49 @@ import 'leaflet/dist/leaflet.css';
 
 import React, { useState, useReducer } from 'react';
 
+/**
+ * @param  {function(state, action)} speculativeReducer - a regular, synchrounous reducer.
+ * @param  {function(state, action, concreteReducer)} concreteGetter - Calls concreteReducer from a promise. Passed concreteValue to concreteReducer
+ * @param  {function(state, action, concreteValue)} concreteReducer - another reducer, from the same state as before, taking into account concreteValue from the async function
+ * 
+ * concreteGetter is fully bound. concreteReducer is called at the end of concreteGetter, and only needs to take the concreteValue.
+ */
+function reducerProducer(speculativeReducer, concreteGetter, concreteReducer) {
+  const reducer = function(state, action) {
+    if (concreteReducer !== undefined) {
+      concreteReducer = concreteReducer.bind(this, state, action);
+    }
+    if (concreteReducer !== undefined) {
+      concreteGetter = concreteGetter.bind(this, state, action, concreteReducer);
+    }
+    // Run the speculative reducer, and save its value.
+    // This is the basic react reducer, and if you only need local changes, you just pass this.
+    const speculativeReducerValue = speculativeReducer(state, action);
+
+    Object.freeze(speculativeReducerValue); // Values returned here should be immutable.
+
+    if (concreteGetter !== undefined) {
+      concreteGetter(state, action, concreteReducer);
+    }
+
+    return speculativeReducerValue;
+  }  
+  return reducer;  
+}
+
 function App() {
   let [activeElement, setActiveElement] = useState(0);
 
-  function activitiesReducer(activities, action) {
-    let cloned_metadata = activities.clone(); // Clone the activities data structure.
-    
-    cloned_metadata.getActivityById(action.activity_id).metadata[action.field] = action.value;
-    Object.freeze(cloned_metadata); // Prevent further changes.
-    
-    return cloned_metadata;
-  }
+  const activitiesReducer = reducerProducer(
+    // speculativeReducer: predict how the state will change, and make those changes here.
+    function(activities, action) {
+      let cloned_metadata = activities.clone(); // Clone the activities data structure.
+      
+      cloned_metadata.getActivityById(action.activity_id).metadata[action.field] = action.value;
+      
+      return cloned_metadata;
+    }
+  )
 
   let [activities, dispatchActivitiesAction] = useReducer(activitiesReducer, mock_activities);
   
