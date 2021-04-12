@@ -39,18 +39,6 @@ function useSpeculativeReducer(initialState, speculativeReducer, concreteGetter,
 function App() {
   let [activeElement, setActiveElement] = useState(0);
 
-  // TODO: Extract code to create an action into a custom hook.
-  const activitiesReducer = reducerProducer(
-    // speculativeReducer: predict how the state will change, and make those changes here.
-    function(activities, action) {
-      let cloned_metadata = activities.clone(); // Clone the activities data structure.
-      
-      cloned_metadata.getActivityById(action.activity_id).metadata[action.field] = action.value;
-      
-      return cloned_metadata;
-    }
-  )
-
   let [activities, dispatchActivitiesAction] = useSpeculativeReducer(mock_activities, 
     function(activities, action) {
       let cloned_metadata = activities.clone(); // Clone the activities data structure.
