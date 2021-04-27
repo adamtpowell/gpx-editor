@@ -12,23 +12,31 @@ import 'leaflet/dist/leaflet.css';
 
 import React, { useState } from 'react';
 
-// Like use reducer, but with speculative and concrete stages.
+// Run speculative reducer on the given state and action.
+// then, run the concrete getter to asynchrounusly get the real value from the database / api / other source.
+// then, use that concrete value to run concrete reducer, which will return the new state.
+//
+// Usage: pass in initialState, speculativeReducer(state, action), async concreteGetter(state, action), concreteReducer(state, action, concreteValue)
 function useSpeculativeReducer(initialState, speculativeReducer, concreteGetter, concreteReducer) {
   let [state, setState] = useState(initialState);
 
- const reducer = function(state, action) {
-  if (concreteReducer !== undefined) {
-    concreteReducer = concreteReducer.bind(this, state, action);
-  }
-  if (concreteReducer !== undefined && concreteGetter !== undefined) {
-    concreteGetter = concreteGetter.bind(this, state, action, concreteReducer);
-  }
+  const reducer = function(state, action) {
+    let speculativeReducerValue;
+    if (speculativeReducer !== undefined) {
+      speculativeReducerValue = speculativeReducer(state, action);
+    }
 
-  const speculativeReducerValue = speculativeReducer(state, action);
-  if (speculativeReducerValue !== undefined) {
-    Object.freeze(speculativeReducerValue);
-    setState(speculativeReducerValue);
-  }
+    if (speculativeReducerValue !== undefined) {
+      setState(Object.freeze(speculativeReducerValue));
+    }
+
+    if (concreteGetter !== undefined) {
+      concreteGetter(state, action).then((concreteGetterValue)=>{
+        const concreteReducerValue = concreteReducer(state, action, concreteGetterValue);
+
+        setState(Object.freeze(concreteReducerValue));
+      })
+    }
  }
 
  const boundReducer = reducer.bind(this, state); // Bind state to reducer so you only need to call with action.
@@ -46,7 +54,7 @@ function App() {
       cloned_metadata.getActivityById(action.activity_id).metadata[action.field] = action.value;
       
       return cloned_metadata;
-  });
+    });
   
   function update_metadata(activity_id, field, value) {
     let action = {
